@@ -47,7 +47,7 @@ const SERIES = [
     color: '#7AA2F7',
   },
   {
-    id: 'BAMLH0A3CCC',
+    id: 'BAMLH0A3HYC',
     short: 'CCC',
     label: 'CCC & Lower High Yield OAS',
     note: 'Distress tail. Leads HY at turning points',
@@ -216,19 +216,37 @@ async function fetchWithRetry(url, attempts = 4) {
         headers: {
           // FRED rejects some default agents outright.
           'User-Agent': 'eod-credit-dashboard/1.0 (+https://github.com)',
-          Accept: 'text/csv,*/*',
+          Accept: 'application/json,text/csv,*/*',
         },
         signal: AbortSignal.timeout(30_000),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+
+      if (!res.ok) {
+        // FRED explains itself in the body — a bad series ID, an expired key,
+        // an out-of-range date all arrive as 400 with a JSON error_message.
+        const body = await res.text().catch(() => '');
+        let detail = body.slice(0, 300).replace(/\s+/g, ' ').trim();
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed.error_message) detail = parsed.error_message;
+        } catch {
+          /* body was not JSON; the raw snippet above is the best we have */
+        }
+
+        const err = new Error(`HTTP ${res.status} — ${detail || res.statusText}`);
+        // 4xx other than rate limiting will fail identically on every retry.
+        err.fatal = res.status >= 400 && res.status < 500 && res.status !== 429;
+        throw err;
+      }
+
       return await res.text();
     } catch (err) {
       lastError = new Error(redact(err.message));
-      if (attempt < attempts) {
-        const backoff = 1000 * 2 ** (attempt - 1);
-        console.warn(`  retry ${attempt}/${attempts - 1} in ${backoff}ms — ${redact(err.message)}`);
-        await new Promise((r) => setTimeout(r, backoff));
-      }
+      if (err.fatal || attempt === attempts) break;
+
+      const backoff = 1000 * 2 ** (attempt - 1);
+      console.warn(`  retry ${attempt}/${attempts - 1} in ${backoff}ms — ${redact(err.message)}`);
+      await new Promise((r) => setTimeout(r, backoff));
     }
   }
   throw lastError;
@@ -252,13 +270,14 @@ async function main() {
   const failures = [];
 
   for (const spec of SERIES) {
-    process.stdout.write(`Fetching ${spec.id} (${spec.label})… `);
     try {
       const observations = toBasisPoints(await fetchSeries(spec), spec.unit);
 
       const latest = observations[observations.length - 1];
       const prev = observations.length > 1 ? observations[observations.length - 2][1] : latest[1];
       const stats = rangeStats(observations);
+      const firstDate = new Date(observations[0][0]).toISOString().slice(0, 10);
+      const lastDate = new Date(latest[0]).toISOString().slice(0, 10);
 
       await writeFile(
         resolve(OUT_DIR, `${spec.id}.json`),
@@ -278,7 +297,8 @@ async function main() {
         color: spec.color,
         unit: 'bps',
         latest: latest[1],
-        latestDate: new Date(latest[0]).toISOString().slice(0, 10),
+        latestDate: lastDate,
+        firstDate,
         change1d: Math.round((latest[1] - prev) * 10) / 10,
         change1w: diff(latest[1], valueDaysAgo(observations, 7)),
         change1m: diff(latest[1], valueDaysAgo(observations, 30)),
@@ -289,10 +309,13 @@ async function main() {
         points: observations.length,
       });
 
-      console.log(`ok — ${observations.length} obs, latest ${latest[1]}bps`);
+      console.log(
+        `ok    ${spec.id.padEnd(22)} ${String(observations.length).padStart(5)} obs  ` +
+          `${firstDate} → ${lastDate}  latest ${latest[1]}bps`
+      );
     } catch (err) {
-      console.error(`FAILED — ${err.message}`);
-      failures.push({ id: spec.id, error: err.message });
+      console.log(`FAIL  ${spec.id.padEnd(22)} ${redact(err.message)}`);
+      failures.push({ id: spec.id, error: redact(err.message) });
     }
   }
 
