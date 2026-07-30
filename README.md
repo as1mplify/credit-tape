@@ -6,7 +6,15 @@ Data comes from FRED's ICE BofA option-adjusted spread series — the standard f
 
 ## Why it's built this way
 
-`fredgraph.csv` doesn't send `Access-Control-Allow-Origin`, so a browser can't call FRED directly. Rather than run a proxy server, the data is fetched at build time and committed to the deployed artifact as static JSON. The site is then pure static files: no runtime, no server bill, no API key. A daily cron re-runs the fetch, which matches the once-a-day cadence of the underlying data anyway.
+`fredgraph.csv` doesn't send `Access-Control-Allow-Origin`, so a browser can't call FRED directly. Rather than run a proxy server, the data is fetched at build time and committed straight back into the repo as static JSON. A daily cron re-runs the fetch, which matches the once-a-day cadence of the underlying data anyway.
+
+The feed WordPress (or anything else) actually reads is:
+
+```
+https://raw.githubusercontent.com/<you>/credit-tape/main/public/
+```
+
+No GitHub Pages required — `raw.githubusercontent.com` serves committed files directly with a ~5 minute CDN cache, which is plenty for once-a-day data. Pages is still wired up as an optional extra (see below) if you also want a browsable dashboard site.
 
 ## Layout
 
@@ -28,9 +36,9 @@ npm run dev      # http://localhost:4173
 npm test         # parser tests
 ```
 
-`public/data/*.json` is gitignored — it's regenerated on every deploy, so there's no reason to version it.
+`public/data/*.json` is committed by the workflow itself (the `Commit data back to main` step) — don't hand-edit it, it's overwritten on every run.
 
-## Deploy to GitHub Pages
+## Deploy
 
 ```bash
 cd eod-credit-dashboard
@@ -40,19 +48,32 @@ git commit -m "Credit spread EOD dashboard"
 gh repo create credit-tape --public --source=. --push
 ```
 
-Then, once:
-
-1. Repo → **Settings → Pages → Build and deployment → Source: GitHub Actions**
-2. Repo → **Actions** → *Refresh data and deploy* → **Run workflow**
-
-Live at `https://<user>.github.io/credit-tape/`. After that it redeploys on every push and on the 23:10 UTC weekday cron.
-
 Without `gh`, create the repo in the web UI and:
 
 ```bash
 git remote add origin https://github.com/<user>/credit-tape.git
 git push -u origin main
 ```
+
+Then, once: Repo → **Actions** → *Refresh data and deploy* → **Run workflow**.
+
+The workflow fetches, runs its tests, and commits `public/data/*.json` back to `main` — no Pages, no setup needed. Your feed URL is:
+
+```
+https://raw.githubusercontent.com/<user>/credit-tape/main/public/
+```
+
+(printed at the end of every successful run, under "Print feed URL"). After the first run, it redeploys on every push and on the 23:10 UTC weekday cron.
+
+### Optional: also serve a browsable dashboard via Pages
+
+If you want `https://<user>.github.io/credit-tape/` as a human-facing page (not required for WordPress):
+
+1. Repo → **Settings → Pages → Build and deployment → Source: GitHub Actions**
+2. Repo → **Settings → Secrets and variables → Actions → Variables** → add `ENABLE_PAGES` = `true`
+3. Re-run the workflow
+
+Without `ENABLE_PAGES` set, the Pages steps are skipped entirely rather than failing.
 
 ## WordPress
 
@@ -109,7 +130,7 @@ It works, but you inherit a fixed height that fights Elementor breakpoints, a co
 | `BAMLH0A0HYM2` | US HY | ICE BofA US High Yield OAS — CDX.NA.HY proxy |
 | `BAMLC0A0CM` | US IG | ICE BofA US Corporate OAS — CDX.NA.IG proxy |
 | `BAMLC0A4CBBB` | BBB | BBB Corporate OAS |
-| `BAMLH0A3CCC` | CCC | CCC & Lower High Yield OAS |
+| `BAMLH0A3HYC` | CCC | CCC & Lower High Yield OAS |
 | `BAMLEMCBPIOAS` | EM Corp | EM Corporate Plus OAS |
 | `BAMLH0A0HYM2EY` | HY Yield | HY effective yield (level, not a spread) |
 
