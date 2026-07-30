@@ -8,7 +8,7 @@
 
 import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = resolve(ROOT, 'public/data');
@@ -22,11 +22,12 @@ const OUT_DIR = resolve(ROOT, 'public/data');
  * BAMLEMCBPIOAS (ICE BofA Emerging Markets Corporate Plus Index OAS).
  */
 const SERIES = [
+  // ---- Tier 1: headline ----
   {
     id: 'BAMLH0A0HYM2',
     short: 'US HY',
     label: 'US High Yield OAS',
-    note: 'Closest free daily proxy for CDX.NA.HY',
+    note: 'The single best read on whether credit is worried',
     unit: 'percent',
     color: '#E8833A',
   },
@@ -34,25 +35,87 @@ const SERIES = [
     id: 'BAMLC0A0CM',
     short: 'US IG',
     label: 'US Investment Grade OAS',
-    note: 'Closest free daily proxy for CDX.NA.IG',
+    note: 'Investment grade master index',
     unit: 'percent',
     color: '#4FC3B0',
   },
   {
-    id: 'BAMLC0A4CBBB',
-    short: 'BBB',
-    label: 'BBB Corporate OAS',
-    note: 'The IG/HY boundary — first to gap in a downgrade cycle',
+    id: 'BAA10Y',
+    short: 'Baa-10Y',
+    label: "Moody's Baa Corporate over 10-Year Treasury",
+    note: 'Daily back to 1986 — the only long history here',
     unit: 'percent',
-    color: '#7AA2F7',
+    color: '#8FA3BF',
+  },
+
+  // ---- Tier 2a: high yield rating ladder ----
+  {
+    id: 'BAMLH0A1HYBB',
+    short: 'BB',
+    label: 'BB US High Yield OAS',
+    note: 'The top of junk. Last to move in a selloff',
+    unit: 'percent',
+    color: '#5FBFA8',
+  },
+  {
+    id: 'BAMLH0A2HYB',
+    short: 'B',
+    label: 'Single-B US High Yield OAS',
+    note: 'The bulk of the high yield market',
+    unit: 'percent',
+    color: '#E0A93F',
   },
   {
     id: 'BAMLH0A3HYC',
     short: 'CCC',
-    label: 'CCC & Lower High Yield OAS',
-    note: 'Distress tail. Leads HY at turning points',
+    label: 'CCC & Lower US High Yield OAS',
+    note: 'Distress tail. Leads the rest at turning points',
     unit: 'percent',
-    color: '#C792EA',
+    color: '#D4553F',
+  },
+
+  // ---- Tier 2b: investment grade rating ladder ----
+  {
+    id: 'BAMLC0A1CAAA',
+    short: 'AAA',
+    label: 'AAA US Corporate OAS',
+    note: 'The safest corporate paper',
+    unit: 'percent',
+    color: '#A9C0DE',
+  },
+  {
+    id: 'BAMLC0A2CAA',
+    short: 'AA',
+    label: 'AA US Corporate OAS',
+    note: 'Where the largest cash-rich issuers sit',
+    unit: 'percent',
+    color: '#7FA3E0',
+  },
+  {
+    id: 'BAMLC0A3CA',
+    short: 'A',
+    label: 'Single-A US Corporate OAS',
+    note: 'Solid investment grade',
+    unit: 'percent',
+    color: '#5C7CD6',
+  },
+  {
+    id: 'BAMLC0A4CBBB',
+    short: 'BBB',
+    label: 'BBB US Corporate OAS',
+    note: 'The IG/HY boundary — first to gap in a downgrade cycle',
+    unit: 'percent',
+    color: '#3F5BC4',
+  },
+
+  // ---- Tier 3: context ----
+  {
+    id: 'T10Y2Y',
+    short: 'Curve',
+    label: '10-Year minus 2-Year Treasury',
+    note: 'Negative means inverted',
+    unit: 'percent',
+    color: '#6B7A99',
   },
   {
     id: 'BAMLEMCBPIOAS',
@@ -60,15 +123,15 @@ const SERIES = [
     label: 'Emerging Markets Corporate OAS',
     note: 'Sovereign and corporate EM credit risk',
     unit: 'percent',
-    color: '#F7C948',
+    color: '#B07CC6',
   },
   {
     id: 'BAMLH0A0HYM2EY',
     short: 'HY Yield',
     label: 'US High Yield Effective Yield',
-    note: 'All-in yield, not a spread — shown in bps for scale consistency',
+    note: 'All-in yield, not a spread',
     unit: 'percent',
-    color: '#8FA3BF',
+    color: '#94A3B8',
   },
 ];
 
@@ -338,7 +401,9 @@ function diff(latest, past) {
   return Math.round((latest - past) * 10) / 10;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// pathToFileURL rather than string-concatenating `file://` — on Windows argv[1]
+// is a drive path (C:\...), which never matches the POSIX-shaped literal.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);

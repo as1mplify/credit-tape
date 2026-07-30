@@ -88,7 +88,7 @@ Drop that into an Elementor **Shortcode** widget, or a Text/HTML widget, or the 
 | Attribute | Default | Notes |
 |---|---|---|
 | `series` | `US HY,US IG` | Short names or FRED IDs, comma separated. Order is preserved. |
-| `window` | `1Y` | `1M` `3M` `6M` `1Y` `3Y` |
+| `window` | `1Y` | `1M` `3M` `6M` `1Y` `3Y` `5Y` `10Y` `MAX` — see history-depth note below |
 | `show` | `both` | `both` `cards` `chart` |
 | `height` | `380` | Chart height in px |
 | `theme` | `light` | `light` `dark` |
@@ -125,14 +125,44 @@ It works, but you inherit a fixed height that fights Elementor breakpoints, a co
 
 ## Series tracked
 
+**Headline**
+
 | FRED ID | Shown as | What it is |
 |---|---|---|
 | `BAMLH0A0HYM2` | US HY | ICE BofA US High Yield OAS — CDX.NA.HY proxy |
 | `BAMLC0A0CM` | US IG | ICE BofA US Corporate OAS — CDX.NA.IG proxy |
-| `BAMLC0A4CBBB` | BBB | BBB Corporate OAS |
-| `BAMLH0A3HYC` | CCC | CCC & Lower High Yield OAS |
+| `BAA10Y` | Baa-10Y | Moody's Baa over 10Y Treasury — **daily back to 1986** |
+
+**High yield rating ladder**
+
+| FRED ID | Shown as | What it is |
+|---|---|---|
+| `BAMLH0A1HYBB` | BB | Top of junk. Last to move in a selloff |
+| `BAMLH0A2HYB` | B | The bulk of the high yield market |
+| `BAMLH0A3HYC` | CCC | Distress tail. Leads the rest at turning points |
+
+**Investment grade rating ladder**
+
+| FRED ID | Shown as | What it is |
+|---|---|---|
+| `BAMLC0A1CAAA` | AAA | The safest corporate paper |
+| `BAMLC0A2CAA` | AA | Where the largest cash-rich issuers sit |
+| `BAMLC0A3CA` | A | Solid investment grade |
+| `BAMLC0A4CBBB` | BBB | The IG/HY boundary — first to gap in a downgrade cycle |
+
+**Context**
+
+| FRED ID | Shown as | What it is |
+|---|---|---|
+| `T10Y2Y` | Curve | 10Y minus 2Y Treasury. Negative means inverted — back to 1976 |
 | `BAMLEMCBPIOAS` | EM Corp | EM Corporate Plus OAS |
 | `BAMLH0A0HYM2EY` | HY Yield | HY effective yield (level, not a spread) |
+
+### History depth is not uniform
+
+FRED truncates every ICE BofA series to a rolling **3 years** (~787 observations). That is a publisher restriction, not a bug, and an API key does not lift it. Only `BAA10Y` (1986→) and `T10Y2Y` (1976→) carry real long history.
+
+Practical consequence: a `window="MAX"` or `window="10Y"` chart is only meaningful for those two. Every other series will simply render 3 years regardless of the window you ask for.
 
 Add or remove series by editing the `SERIES` array in `scripts/fetch-fred.mjs` — the frontend builds itself from the manifest, so nothing else needs touching.
 

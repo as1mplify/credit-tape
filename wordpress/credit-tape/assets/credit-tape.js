@@ -2,7 +2,10 @@
 (function () {
   'use strict';
 
-  var DAYS = { '1M': 30, '3M': 91, '6M': 182, '1Y': 365, '3Y': 1095 };
+  var DAYS = {
+    '1M': 30, '3M': 91, '6M': 182, '1Y': 365,
+    '3Y': 1095, '5Y': 1825, '10Y': 3650, 'MAX': null
+  };
 
   function fmt(n) {
     return Math.round(n).toLocaleString('en-US');
@@ -98,8 +101,8 @@
       return;
     }
 
-    var days = DAYS[cfg.window] || 365;
-    var cutoff = Date.now() - days * 86400000;
+    var days = Object.prototype.hasOwnProperty.call(DAYS, cfg.window) ? DAYS[cfg.window] : 365;
+    var cutoff = days === null ? -Infinity : Date.now() - days * 86400000;
     var dark = cfg.theme === 'dark';
     var gridColor = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
     var tickColor = dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)';
@@ -136,7 +139,11 @@
             ticks: {
               color: tickColor, font: font, maxTicksLimit: 7, autoSkip: true,
               callback: function (v) {
-                return new Date(v).toLocaleDateString(undefined, {
+                var d = new Date(v);
+                if (days === null || days > 1200) {
+                  return String(d.getUTCFullYear());
+                }
+                return d.toLocaleDateString(undefined, {
                   month: 'short',
                   day: days <= 91 ? '2-digit' : undefined,
                   year: days > 182 ? '2-digit' : undefined,

@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name:  Credit Tape
- * Description:  Renders end-of-day credit spreads from a Credit Tape GitHub Pages feed. Syncs once daily, caches server-side, no CORS.
- * Version:      1.0.0
+ * Description:  Renders end-of-day credit spreads from a Credit Tape JSON feed. Syncs once daily, caches server-side, no CORS.
+ * Version:      1.1.0
  * Requires PHP: 7.4
  * Author:       Stepan
  * License:      MIT
@@ -10,12 +10,15 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'CREDIT_TAPE_VERSION', '1.0.0' );
+define( 'CREDIT_TAPE_VERSION', '1.1.0' );
 define( 'CREDIT_TAPE_CACHE_KEY', 'credit_tape_data_v1' );
 define( 'CREDIT_TAPE_FALLBACK_KEY', 'credit_tape_last_good_v1' );
 define( 'CREDIT_TAPE_CRON_HOOK', 'credit_tape_refresh' );
 
-/** Trailing-slash base URL of the deployed dashboard, e.g. https://user.github.io/credit-tape/ */
+/**
+ * Trailing-slash base URL of the published feed, e.g.
+ * https://raw.githubusercontent.com/<user>/credit-tape/main/public/
+ */
 function credit_tape_base_url() {
 	$url = defined( 'CREDIT_TAPE_BASE_URL' )
 		? CREDIT_TAPE_BASE_URL
@@ -26,7 +29,25 @@ function credit_tape_base_url() {
 
 /** Longest history retained server-side. Shortcode windows slice out of this. */
 function credit_tape_max_days() {
-	return (int) apply_filters( 'credit_tape_max_days', 1095 );
+	// 40 years. The ICE series are capped at 3 by the publisher anyway; this
+	// only matters for BAA10Y (1986→) and T10Y2Y.
+	return (int) apply_filters( 'credit_tape_max_days', 365 * 40 );
+}
+
+/** Window key → days of history. null means everything available. */
+function credit_tape_window_days( $key ) {
+	$map = array(
+		'1M'  => 30,
+		'3M'  => 91,
+		'6M'  => 182,
+		'1Y'  => 365,
+		'3Y'  => 1095,
+		'5Y'  => 1825,
+		'10Y' => 3650,
+		'MAX' => null,
+	);
+	$key = strtoupper( trim( (string) $key ) );
+	return array_key_exists( $key, $map ) ? $map[ $key ] : 365;
 }
 
 /* -------------------------------------------------------------------------
@@ -160,7 +181,7 @@ function credit_tape_shortcode( $atts ) {
 	$a = shortcode_atts(
 		array(
 			'series' => 'US HY,US IG', // short names or FRED IDs, comma separated
-			'window' => '1Y',          // 1M 3M 6M 1Y 3Y
+			'window' => '1Y',          // 1M 3M 6M 1Y 3Y 5Y 10Y MAX
 			'show'   => 'both',        // both | cards | chart
 			'height' => '380',
 			'theme'  => 'light',       // light | dark
@@ -212,10 +233,39 @@ function credit_tape_shortcode( $atts ) {
 
 	credit_tape_enqueue();
 
+	// Trim each series to the requested window before inlining. Without this a
+	// MAX-window BAA10Y chart would push ~200KB of JSON into the page source.
+	$window     = strtoupper( $a['window'] );
+	$window_days = credit_tape_window_days( $window );
+
+	if ( null !== $window_days ) {
+		$cutoff_ms = ( time() - $window_days * DAY_IN_SECONDS ) * 1000;
+		foreach ( $selected as $i => $s ) {
+			if ( empty( $s['observations'] ) ) {
+				continue;
+			}
+			$selected[ $i ]['observations'] = array_values(
+				array_filter(
+					$s['observations'],
+					static function ( $row ) use ( $cutoff_ms ) {
+						return isset( $row[0] ) && $row[0] >= $cutoff_ms;
+					}
+				)
+			);
+		}
+	}
+
+	// Cards need no series history at all — drop it entirely.
+	if ( 'cards' === $a['show'] ) {
+		foreach ( $selected as $i => $s ) {
+			$selected[ $i ]['observations'] = array();
+		}
+	}
+
 	$id      = 'credit-tape-' . wp_unique_id();
 	$payload = array(
 		'series'   => $selected,
-		'window'   => strtoupper( $a['window'] ),
+		'window'   => $window,
 		'show'     => $a['show'],
 		'theme'    => $a['theme'],
 		'up'       => $a['up'],
@@ -297,8 +347,8 @@ function credit_tape_settings_page() {
 						<input type="url" class="regular-text" id="credit_tape_base_url"
 							name="credit_tape_base_url"
 							value="<?php echo esc_attr( get_option( 'credit_tape_base_url', '' ) ); ?>"
-							placeholder="https://yourname.github.io/credit-tape/">
-						<p class="description">Root of the deployed dashboard. The plugin reads <code>data/manifest.json</code> beneath it.</p>
+							placeholder="https://raw.githubusercontent.com/user/credit-tape/main/public/">
+						<p class="description">Root of the published feed. The plugin reads <code>data/manifest.json</code> beneath it.</p>
 					</td>
 				</tr>
 			</table>
@@ -331,7 +381,7 @@ function credit_tape_settings_page() {
 				? esc_html( implode( ', ', wp_list_pluck( $data['series'], 'short' ) ) )
 				: 'sync first to list available series';
 			?><br>
-			<strong>window</strong> — 1M, 3M, 6M, 1Y, 3Y &nbsp;·&nbsp;
+			<strong>window</strong> — 1M, 3M, 6M, 1Y, 3Y, 5Y, 10Y, MAX &nbsp;·&nbsp;
 			<strong>show</strong> — both, cards, chart &nbsp;·&nbsp;
 			<strong>theme</strong> — light, dark<br>
 			<strong>accent</strong> — one hex for all lines &nbsp;·&nbsp;
