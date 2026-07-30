@@ -1,0 +1,24 @@
+{
+  "name": "eod-credit-dashboard",
+  "version": "1.0.0",
+  "description": "End-of-day credit spread and CDS-proxy monitor built on free FRED data.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "fetch": "node scripts/fetch-fred.mjs",
+    "test": "node scripts/fetch-fred.test.mjs",
+    "dev": "node server.mjs",
+    "build": "npm run fetch"
+  },
+  "keywords": [
+    "credit-spreads",
+    "cds",
+    "fred",
+    "oas",
+    "dashboard"
+  ],
+  "license": "MIT",
+  "dependencies": {}
+}
