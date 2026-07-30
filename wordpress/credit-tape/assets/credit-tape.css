@@ -1,0 +1,203 @@
+/* Credit Tape — inherits the host theme's font stack on purpose. */
+
+.credit-tape {
+  --ct-bg: transparent;
+  --ct-card: rgba(0, 0, 0, 0.025);
+  --ct-rule: rgba(0, 0, 0, 0.12);
+  --ct-text: inherit;
+  --ct-dim: rgba(0, 0, 0, 0.55);
+  --ct-faint: rgba(0, 0, 0, 0.38);
+
+  color: var(--ct-text);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.credit-tape--dark {
+  --ct-card: rgba(255, 255, 255, 0.04);
+  --ct-rule: rgba(255, 255, 255, 0.14);
+  --ct-dim: rgba(255, 255, 255, 0.62);
+  --ct-faint: rgba(255, 255, 255, 0.42);
+}
+
+.credit-tape *,
+.credit-tape *::before,
+.credit-tape *::after { box-sizing: border-box; }
+
+/* ---------- cards ---------- */
+
+.credit-tape-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1px;
+  background: var(--ct-rule);
+  border: 1px solid var(--ct-rule);
+  margin-bottom: 1.75rem;
+}
+
+.credit-tape .credit-tape-card {
+  background: var(--ct-card);
+  padding: 1rem 1.1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.credit-tape .ct-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.credit-tape .ct-swatch {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.credit-tape .ct-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ct-dim);
+}
+
+.credit-tape .ct-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.credit-tape .ct-value {
+  font-size: 1.9rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-tape .ct-unit {
+  font-size: 0.72rem;
+  color: var(--ct-faint);
+}
+
+.credit-tape .ct-deltas {
+  display: flex;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+}
+
+.credit-tape .ct-deltas div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.credit-tape .ct-deltas dt {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ct-faint);
+}
+
+.credit-tape .ct-deltas dd {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-tape .is-up { color: var(--ct-up, #c51e3a); }
+.credit-tape .is-down { color: var(--ct-down, #2f9e8f); }
+.credit-tape .is-flat { color: var(--ct-faint); }
+
+/* ---------- range rail ---------- */
+
+.credit-tape .ct-rail {
+  margin-top: auto;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--ct-rule);
+}
+
+.credit-tape .ct-rail-track {
+  position: relative;
+  height: 20px;
+  margin: 0.4rem 0 0.3rem;
+}
+
+.credit-tape .ct-rail-line {
+  position: absolute;
+  top: 9px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--ct-rule);
+}
+
+.credit-tape .ct-tick {
+  position: absolute;
+  top: 3px;
+  width: 2px;
+  height: 14px;
+  margin-left: -1px;
+  transition: left 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.credit-tape .ct-tick--then {
+  top: 6px;
+  height: 8px;
+  background: var(--ct-faint);
+}
+
+.credit-tape .ct-rail-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ct-faint);
+}
+
+.credit-tape .ct-rail-caption {
+  margin: 0.45rem 0 0;
+  font-size: 0.73rem;
+  line-height: 1.35;
+  color: var(--ct-faint);
+}
+
+/* ---------- chart + stamp ---------- */
+
+.credit-tape-chart {
+  position: relative;
+  width: 100%;
+}
+
+.credit-tape-chart canvas {
+  max-width: 100%;
+}
+
+.credit-tape .credit-tape-stamp {
+  margin: 0.9rem 0 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--ct-faint);
+}
+
+.credit-tape-notice {
+  padding: 0.85rem 1rem;
+  border-left: 3px solid #c51e3a;
+  background: rgba(197, 30, 58, 0.06);
+  font-size: 0.88rem;
+}
+
+@media (max-width: 480px) {
+  .credit-tape .ct-value { font-size: 1.6rem; }
+  .credit-tape .ct-deltas { gap: 0.8rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credit-tape .ct-tick { transition: none; }
+}
