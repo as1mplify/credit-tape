@@ -33,6 +33,10 @@ jobs:
 
       - name: Pull end-of-day marks from FRED
         run: npm run fetch
+        env:
+          # Optional. Without it the script uses the public CSV endpoint instead.
+          # Set at Settings → Secrets and variables → Actions → New repository secret.
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
 
       - uses: actions/configure-pages@v5
 
