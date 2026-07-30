@@ -72,8 +72,76 @@ const SERIES = [
   },
 ];
 
+/**
+ * Optional. When FRED_API_KEY is set we use the documented JSON API; otherwise
+ * we fall back to the public fredgraph.csv endpoint, which needs no key.
+ * Either way the key never reaches the browser — this runs at build time and
+ * only the resulting JSON is published.
+ */
+const API_KEY = (process.env.FRED_API_KEY ?? '').trim();
+
+/** Earliest observation to request, e.g. FRED_START=2010-01-01 to shrink payloads. */
+const START = (process.env.FRED_START ?? '').trim();
+
+/** Strips the key out of anything headed for a log. Actions masks secrets, but don't rely on it. */
+const redact = (text) =>
+  API_KEY ? String(text).split(API_KEY).join('***') : String(text);
+
 const FRED_CSV = (id) =>
   `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${encodeURIComponent(id)}`;
+
+const FRED_API = (id) => {
+  const url = new URL('https://api.stlouisfed.org/fred/series/observations');
+  url.searchParams.set('series_id', id);
+  url.searchParams.set('api_key', API_KEY);
+  url.searchParams.set('file_type', 'json');
+  url.searchParams.set('sort_order', 'asc');
+  if (START) url.searchParams.set('observation_start', START);
+  return url.toString();
+};
+
+/**
+ * Parses the JSON API shape: { observations: [{ date, value }, ...] }.
+ * Missing observations use "." here too.
+ *
+ * @returns {[number, number][]} [epochMillis, value] pairs, ascending.
+ */
+export function parseFredJson(json) {
+  if (!json || !Array.isArray(json.observations)) {
+    throw new Error('API response had no observations array');
+  }
+
+  const out = [];
+  for (const row of json.observations) {
+    if (!row || row.value === '.' || row.value == null) continue;
+    const value = Number(row.value);
+    const ts = Date.parse(`${row.date}T00:00:00Z`);
+    if (!Number.isFinite(value) || !Number.isFinite(ts)) continue;
+    out.push([ts, value]);
+  }
+
+  if (out.length === 0) throw new Error('API responded but contained no numeric rows');
+  out.sort((a, b) => a[0] - b[0]);
+  return out;
+}
+
+/** Pulls one series through whichever transport is configured. */
+async function fetchSeries(spec) {
+  if (API_KEY) {
+    const body = await fetchWithRetry(FRED_API(spec.id));
+    let json;
+    try {
+      json = JSON.parse(body);
+    } catch {
+      throw new Error(`API returned non-JSON for ${spec.id}`);
+    }
+    // FRED reports auth and lookup failures as 400 with a JSON error_message.
+    if (json.error_message) throw new Error(redact(json.error_message));
+    return parseFredJson(json);
+  }
+
+  return parseFredCsv(await fetchWithRetry(FRED_CSV(spec.id)));
+}
 
 /**
  * FRED's CSV is two columns. The date header has been both `DATE` and
@@ -155,10 +223,10 @@ async function fetchWithRetry(url, attempts = 4) {
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
       return await res.text();
     } catch (err) {
-      lastError = err;
+      lastError = new Error(redact(err.message));
       if (attempt < attempts) {
         const backoff = 1000 * 2 ** (attempt - 1);
-        console.warn(`  retry ${attempt}/${attempts - 1} in ${backoff}ms — ${err.message}`);
+        console.warn(`  retry ${attempt}/${attempts - 1} in ${backoff}ms — ${redact(err.message)}`);
         await new Promise((r) => setTimeout(r, backoff));
       }
     }
@@ -168,6 +236,13 @@ async function fetchWithRetry(url, attempts = 4) {
 
 async function main() {
   await mkdir(OUT_DIR, { recursive: true });
+
+  console.log(
+    API_KEY
+      ? `Transport: FRED JSON API (key ending …${API_KEY.slice(-4)})` +
+          (START ? `, from ${START}` : '')
+      : 'Transport: public fredgraph.csv (no API key set)'
+  );
 
   const manifest = {
     generatedAt: new Date().toISOString(),
@@ -179,8 +254,7 @@ async function main() {
   for (const spec of SERIES) {
     process.stdout.write(`Fetching ${spec.id} (${spec.label})… `);
     try {
-      const csv = await fetchWithRetry(FRED_CSV(spec.id));
-      const observations = toBasisPoints(parseFredCsv(csv), spec.unit);
+      const observations = toBasisPoints(await fetchSeries(spec), spec.unit);
 
       const latest = observations[observations.length - 1];
       const prev = observations.length > 1 ? observations[observations.length - 2][1] : latest[1];

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseFredCsv, toBasisPoints } from './fetch-fred.mjs';
+import { parseFredCsv, parseFredJson, toBasisPoints } from './fetch-fred.mjs';
 
 test('parses the modern observation_date header', () => {
   const csv = ['observation_date,BAMLH0A0HYM2', '2026-07-27,2.81', '2026-07-28,2.94'].join('\n');
@@ -40,4 +40,33 @@ test('leaves already-bps series alone', () => {
 test('throws on an empty or malformed feed', () => {
   assert.throws(() => parseFredCsv('observation_date,X'), /no observations/);
   assert.throws(() => parseFredCsv('observation_date,X\n2026-07-28,.'), /no numeric rows/);
+});
+
+test('parses the JSON API observation shape', () => {
+  const rows = parseFredJson({
+    observations: [
+      { date: '2026-07-27', value: '2.81' },
+      { date: '2026-07-28', value: '.' },
+      { date: '2026-07-29', value: '2.94' },
+    ],
+  });
+  assert.equal(rows.length, 2);
+  assert.equal(rows[1][1], 2.94);
+  assert.equal(new Date(rows[0][0]).toISOString(), '2026-07-27T00:00:00.000Z');
+});
+
+test('CSV and JSON transports agree on the same data', () => {
+  const csv = parseFredCsv('observation_date,X\n2026-07-27,2.81\n2026-07-29,2.94');
+  const json = parseFredJson({
+    observations: [
+      { date: '2026-07-27', value: '2.81' },
+      { date: '2026-07-29', value: '2.94' },
+    ],
+  });
+  assert.deepEqual(csv, json);
+});
+
+test('rejects an API payload with no usable rows', () => {
+  assert.throws(() => parseFredJson({ observations: [] }), /no numeric rows/);
+  assert.throws(() => parseFredJson({}), /no observations array/);
 });
