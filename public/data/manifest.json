@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-01T00:10:03.779Z",
+  "generatedAt": "2026-08-04T00:15:13.384Z",
   "source": "Federal Reserve Economic Data (FRED), ICE BofA index families",
   "series": [
     {
@@ -47,17 +47,17 @@
       "note": "Daily back to 1986 — the only long history here",
       "color": "#8FA3BF",
       "unit": "bps",
-      "latest": 164,
-      "latestDate": "2026-07-30",
+      "latest": 163,
+      "latestDate": "2026-07-31",
       "firstDate": "1986-01-02",
-      "change1d": 4,
-      "change1w": 6,
-      "change1m": 11,
-      "change1y": -5,
+      "change1d": -1,
+      "change1w": 4,
+      "change1m": 9,
+      "change1y": -4,
       "low3y": 136,
       "high3y": 202,
-      "percentile3y": 0.424,
-      "points": 10144
+      "percentile3y": 0.409,
+      "points": 10145
     },
     {
       "id": "BAMLH0A1HYBB",
@@ -199,17 +199,17 @@
       "note": "Negative means inverted",
       "color": "#6B7A99",
       "unit": "bps",
-      "latest": 47,
-      "latestDate": "2026-07-31",
+      "latest": 45,
+      "latestDate": "2026-08-03",
       "firstDate": "1976-06-01",
-      "change1d": 2,
+      "change1d": -2,
       "change1w": 11,
-      "change1m": 16,
-      "change1y": 4,
-      "low3y": -87,
+      "change1m": 10,
+      "change1y": -9,
+      "low3y": -79,
       "high3y": 74,
-      "percentile3y": 0.832,
-      "points": 12538
+      "percentile3y": 0.81,
+      "points": 12539
     },
     {
       "id": "BAMLEMCBPIOAS",
